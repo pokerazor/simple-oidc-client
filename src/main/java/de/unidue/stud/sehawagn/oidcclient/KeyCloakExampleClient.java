@@ -26,7 +26,7 @@ import java.net.URL;
 
 import javax.net.ssl.HttpsURLConnection;
 
-import org.keycloak.client.registration.ClientRegistrationException;
+//import org.keycloak.client.registration.ClientRegistrationException;
 
 import com.nimbusds.oauth2.sdk.ParseException;
 import com.nimbusds.oauth2.sdk.SerializeException;
@@ -105,10 +105,10 @@ public class KeyCloakExampleClient {
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		} catch (ClientRegistrationException e) {
+/*		} catch (ClientRegistrationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
+*/		}
 	}
 
 	public static void init() {
@@ -154,13 +154,13 @@ public class KeyCloakExampleClient {
 		oidcClient = new SimpleOIDCClient();
 	}
 
-	public static void doProvisioning() throws URISyntaxException, ParseException, IOException, SerializeException, ClientRegistrationException {
+	public static void doProvisioning() throws URISyntaxException, ParseException, IOException, SerializeException { //, ClientRegistrationException {
 		stepOne();
 		stepTwo();
 		stepThree();
 	}
 
-	public static void doResourceAccess() throws ParseException, URISyntaxException, IOException, SerializeException, ClientRegistrationException {
+	public static void doResourceAccess() throws ParseException, URISyntaxException, IOException, SerializeException { //, ClientRegistrationException {
 		String authRedirection = "";
 		AccessToken accessToken = null;
 
@@ -212,7 +212,7 @@ public class KeyCloakExampleClient {
 
 	// Optional: Dynamic client registration
 	// Alternatively: Provide client data manually
-	public static void stepThree() throws ClientRegistrationException, ParseException, URISyntaxException, SerializeException, IOException {
+	public static void stepThree() throws ParseException, URISyntaxException, SerializeException, IOException { //, ClientRegistrationException {
 //		doClientRegistrationKeycloak();  // only in case of dynamic client registration // FIMXME not working yet
 
 //		doClientConfiguration(true);
@@ -284,13 +284,13 @@ public class KeyCloakExampleClient {
 		BearerAccessToken initialAccessToken = new BearerAccessToken(initialAccessTokenString);
 		oidcClient.registerClient(initialAccessToken);
 	}
-
+/*
 	// optional dynamic client registration (via Keycloak library)
 	// FIXME doesn't work (false/null error)
 	public static void doClientRegistrationKeycloak() throws ClientRegistrationException {
 		SimpleOIDCClient.registerClientKeycloak(clientID, initialAccessTokenString, keycloakServer + KEYCLOAK_AUTH_PATH, keycloakRealm);
 	}
-
+*/
 	public static void doResourceOwnerCredentialsAccess(String authRedirection) throws ParseException, URISyntaxException {
 //		System.out.println("parse authentication parameters from redirection");
 		oidcClient.parseAuthenticationDataFromRedirect(authRedirection, false); // don't override clientID (what are the caveats of both ways?)

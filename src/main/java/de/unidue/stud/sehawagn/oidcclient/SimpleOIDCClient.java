@@ -29,11 +29,8 @@ import java.net.URL;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.X509Certificate;
-import java.security.interfaces.RSAPublicKey;
-import java.security.spec.InvalidKeySpecException;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Scanner;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
@@ -41,7 +38,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
-
+/*
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
@@ -49,12 +46,10 @@ import org.keycloak.client.registration.Auth;
 import org.keycloak.client.registration.ClientRegistration;
 import org.keycloak.client.registration.ClientRegistrationException;
 import org.keycloak.representations.idm.ClientRepresentation;
+*/
 
-import com.nimbusds.jose.JOSEException;
-import com.nimbusds.jose.crypto.RSASSAVerifier;
-import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.JWT;
-import com.nimbusds.jwt.ReadOnlyJWTClaimsSet;
+import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.oauth2.sdk.AuthorizationCode;
 import com.nimbusds.oauth2.sdk.AuthorizationCodeGrant;
 import com.nimbusds.oauth2.sdk.AuthorizationGrant;
@@ -84,7 +79,7 @@ import com.nimbusds.openid.connect.sdk.AuthenticationResponse;
 import com.nimbusds.openid.connect.sdk.AuthenticationResponseParser;
 import com.nimbusds.openid.connect.sdk.AuthenticationSuccessResponse;
 import com.nimbusds.openid.connect.sdk.Nonce;
-import com.nimbusds.openid.connect.sdk.OIDCAccessTokenResponse;
+import com.nimbusds.openid.connect.sdk.OIDCTokenResponse;
 import com.nimbusds.openid.connect.sdk.OIDCTokenResponseParser;
 import com.nimbusds.openid.connect.sdk.Prompt;
 import com.nimbusds.openid.connect.sdk.UserInfoErrorResponse;
@@ -97,9 +92,7 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientInformationResponse;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientRegistrationRequest;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientRegistrationResponseParser;
-import com.nimbusds.openid.connect.sdk.util.DefaultJWTDecoder;
 
-import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 
 /* 
@@ -136,7 +129,7 @@ public class SimpleOIDCClient {
 	private JWT idToken;
 
 	private JSONObject userInfoClaims;
-	private ReadOnlyJWTClaimsSet idClaims;
+	private JWTClaimsSet idClaims;
 
 	/*
 	 * Issuer discovery
@@ -398,7 +391,7 @@ public class SimpleOIDCClient {
 
 		HTTPResponse tokenHTTPResp = null;
 		try {
-			tokenHTTPResp = tokenReq.toHTTPRequest().send();
+			tokenHTTPResp = tokenReq.toHTTPRequest().send(HttpsURLConnection.getDefaultHostnameVerifier(),HttpsURLConnection.getDefaultSSLSocketFactory());
 		} catch (SerializeException | IOException e) {
 			// TODO proper error handling
 			e.printStackTrace();
@@ -421,9 +414,9 @@ public class SimpleOIDCClient {
 			return;
 		}
 
-		OIDCAccessTokenResponse accessTokenResponse = (OIDCAccessTokenResponse) tokenResponse;
-		accessToken = accessTokenResponse.getAccessToken();
-		idToken = accessTokenResponse.getIDToken();
+		OIDCTokenResponse accessTokenResponse = (OIDCTokenResponse) tokenResponse;
+		accessToken = accessTokenResponse.getOIDCTokens().getAccessToken();
+		idToken = accessTokenResponse.getOIDCTokens().getIDToken();
 	}
 
 	public AccessToken getAccessToken() {
@@ -439,7 +432,7 @@ public class SimpleOIDCClient {
 
 		if (idToken != null) {
 			idClaims = verifyIdToken();
-			Map<String, Object> allClaims = idClaims.getAllClaims();
+			Map<String, Object> allClaims = idClaims.getClaims();
 			for (Iterator<String> iterator = allClaims.keySet().iterator(); iterator.hasNext();) {
 				String claimKey = (String) iterator.next();
 				System.out.println(claimKey + ":" + allClaims.get(claimKey));
@@ -463,7 +456,7 @@ public class SimpleOIDCClient {
 
 		HTTPResponse userInfoHTTPResp = null;
 		try {
-			userInfoHTTPResp = userInfoReq.toHTTPRequest().send();
+			userInfoHTTPResp = userInfoReq.toHTTPRequest().send(HttpsURLConnection.getDefaultHostnameVerifier(),HttpsURLConnection.getDefaultSSLSocketFactory());
 		} catch (SerializeException | IOException e) {
 			// TODO proper error handling
 			e.printStackTrace();
@@ -500,51 +493,16 @@ public class SimpleOIDCClient {
 	 * Validate the ID token
 	 * The id token obtained from the token request must be validated, see ID token validation:
 	 */
-	private ReadOnlyJWTClaimsSet verifyIdToken() throws ParseException {
-		RSAPublicKey providerKey = null;
+	private JWTClaimsSet verifyIdToken() throws ParseException {
+		JWTClaimsSet claims = null;
 		try {
-			JSONObject key = getProviderRSAJWK(providerMetadata.getJWKSetURI().toURL().openStream());
-			providerKey = RSAKey.parse(key).toRSAPublicKey();
-		} catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException | java.text.ParseException e) {
-			// TODO error handling
-			e.printStackTrace();
-		}
-
-		DefaultJWTDecoder jwtDecoder = new DefaultJWTDecoder();
-		jwtDecoder.addJWSVerifier(new RSASSAVerifier(providerKey));
-		ReadOnlyJWTClaimsSet claims = null;
-		try {
-			claims = jwtDecoder.decodeJWT(idToken);
-		} catch (JOSEException | java.text.ParseException e) {
+			claims = idToken.getJWTClaimsSet();
+		} catch (java.text.ParseException e) {
 			// TODO error handling
 			e.printStackTrace();
 		}
 
 		return claims;
-	}
-
-	private JSONObject getProviderRSAJWK(InputStream is) throws ParseException {
-		// Read all data from stream
-		StringBuilder sb = new StringBuilder();
-		try (Scanner scanner = new Scanner(is);) {
-			while (scanner.hasNext()) {
-				sb.append(scanner.next());
-			}
-		}
-
-		// Parse the data as JSON
-		String jsonString = sb.toString();
-		JSONObject json = JSONObjectUtils.parse(jsonString);
-
-		// Find the RSA signing key
-		JSONArray keyList = (JSONArray) json.get("keys");
-		for (Object key : keyList) {
-			JSONObject k = (JSONObject) key;
-			if (k.get("use").equals("sig") && k.get("kty").equals("RSA")) {
-				return k;
-			}
-		}
-		return null;
 	}
 
 	public JSONObject getUserInfoJSON() {
@@ -600,7 +558,7 @@ public class SimpleOIDCClient {
 		return sc;
 	}
 	// SECURITY BREACH!!! !!NEVER!! use this on production systems, only for debugging
-
+/*
 	// use official org.keycloak.client library
 	public static String registerClientKeycloak(String CLIENT_ID, String token, String keycloakBaseAuthURL, String realm) throws ClientRegistrationException {
 		// token = "eyJhbGciOiJSUz...";
@@ -627,4 +585,5 @@ public class SimpleOIDCClient {
 		String registrationAccessToken = client.getRegistrationAccessToken();
 		return registrationAccessToken;
 	}
+	*/
 }
